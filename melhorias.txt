@@ -1,0 +1,10 @@
+Melhorias chatbot
+
+- Adcionar bloqueio por senha no cadastro de novos pdfs, para so cadastrar apos validação do pdf - ok
+- Melhorar prompt de instrução para reduzir a resposta 
+- Publicar acesso ao chatbot para usuarios na rede local  
+- Ajeitar o layout para ser responsivel - melhorar 
+- As chaves da api estao mudando ao trocar de provedor, estao ficando todas iguais - testar
+- Armazenar os pdfs, chaves de api, senhas em um banco de dados local da aplicação 
+- Testar segurança da aplicação
+
