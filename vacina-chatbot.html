@@ -1284,7 +1284,7 @@ async function testOllama() {
   for (const { url, label } of urls) {
     try {
       resultEl.textContent = `⏳ Tentando ${label}...`;
-      const res = await fetch('http://localhost:3000/api/status', { signal: AbortSignal.timeout(5000) });
+      const res = await fetch('https://vacina-aibot.onrender.com/api/status', { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         let info = '';
         try {
@@ -1313,7 +1313,7 @@ async function testOllama() {
 
   // Testa direto no Ollama sem proxy para dar dica melhor
   try {
-    await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
+    await fetch('https://vacina-aibot.onrender.com/api/tags', { signal: AbortSignal.timeout(3000) });
     resultEl.style.background = 'rgba(171,31,26,0.08)';
     resultEl.style.color = '#ab1f1a';
     resultEl.textContent = '⚠️ Ollama está rodando mas o proxy não. Abra o iniciar-vaccinabot.bat';
