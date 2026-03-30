@@ -492,14 +492,15 @@
   align-items: center;
 }
 
-/* campo de digitação (ESSENCIAL pro mobile) */
+/* campo de digitação */
 .input-area input,
 .input-area textarea {
-  font-size: 16px; /* 👈 evita zoom automático */
+  font-size: 16px; /* 👈 evita zoom no mobile */
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 10px;
+  padding: 10px 12px; /* 👈 reduz sensação de “texto grande” */
+  line-height: 1.2;
   outline: none;
 }
 
