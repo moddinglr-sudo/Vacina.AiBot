@@ -477,19 +477,39 @@
   }
 
   /* ── INPUT ── */
-  .input-area {
-    padding: 16px 24px 20px;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-  }
+.input-area {
+  padding: 16px 24px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
 
-  .input-toolbar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-    align-items: center;
-  }
+/* toolbar */
+.input-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+/* campo de digitação (ESSENCIAL pro mobile) */
+.input-area input,
+.input-area textarea {
+  font-size: 16px; /* 👈 evita zoom automático */
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+}
+
+/* comportamento melhor para textarea (chat) */
+.input-area textarea {
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  overflow-y: auto;
+}
 
   .toolbar-label {
     font-size: 10px;
