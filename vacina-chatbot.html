@@ -580,6 +580,34 @@
   .send-btn:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 0 20px rgba(171,31,26,0.30); }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+  .mic-btn {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--accent2);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .mic-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(171,31,26,0.06); }
+  .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .mic-btn.recording {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    animation: micPulse 1.2s infinite;
+  }
+
+  @keyframes micPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(204,34,34,0.35); }
+    50%      { box-shadow: 0 0 0 8px rgba(204,34,34,0); }
+  }
+
   .input-hint {
     font-size: 11px;
     color: var(--text-muted);
@@ -1032,6 +1060,7 @@
           onkeydown="handleKey(event)"
           oninput="autoResize(this)"
         ></textarea>
+        <button class="mic-btn" id="micBtn" onclick="toggleVoiceInput()" title="Falar (entrada por voz)">🎤</button>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Enviar (Enter)">➤</button>
       </div>
       <div class="input-hint">2026 © Alto Padrão Laboratório CNPJ: 12.377.868/0001-94 </div>
@@ -1683,8 +1712,8 @@ function setMode(m) {
   document.getElementById('modeGeneral').classList.toggle('active', m === 'general');
   document.getElementById('chatInput').placeholder =
     m === 'rag'
-      ? 'Pergunte sobre os documentos carregados...'
-      : 'Pergunte qualquer coisa sobre vacinas e imunização...';
+      ? 'Pergunte ao Vacina.Ai...'
+      : 'Pergunte ao Vacina.Ai...';
 }
 
 function autoResize(el) {
@@ -1697,6 +1726,109 @@ function handleKey(e) {
     e.preventDefault();
     sendMessage();
   }
+}
+
+// ── ENTRADA POR VOZ (Web Speech API) ──
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isRecording = false;
+let baseTextBeforeRecording = ''; // texto já digitado antes de começar a falar
+
+function initSpeechRecognition() {
+  if (!SpeechRecognitionAPI) return null;
+  const rec = new SpeechRecognitionAPI();
+  rec.lang = 'pt-BR';
+  rec.continuous = true;
+  rec.interimResults = true;
+
+  rec.onresult = (event) => {
+    let finalText = '';
+    let interimText = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += transcript;
+      else interimText += transcript;
+    }
+    if (finalText) {
+      baseTextBeforeRecording = (baseTextBeforeRecording + ' ' + finalText).trim();
+    }
+    const input = document.getElementById('chatInput');
+    input.value = (baseTextBeforeRecording + ' ' + interimText).trim();
+    autoResize(input);
+  };
+
+  rec.onerror = (event) => {
+    console.warn('[Voz] Erro no reconhecimento:', event.error);
+    stopVoiceInput();
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      addMessage('bot', `<span style="color:var(--danger)">⚠️ Permissão de microfone negada. Habilite o acesso ao microfone nas configurações do navegador.</span>`);
+    } else if (event.error === 'no-speech') {
+      // silêncio — não precisa alarmar o usuário, apenas encerra
+    } else {
+      addMessage('bot', `<span style="color:var(--danger)">⚠️ Erro no reconhecimento de voz: ${event.error}</span>`);
+    }
+  };
+
+  rec.onend = () => {
+    // Se o usuário ainda não mandou parar manualmente mas o navegador encerrou sozinho
+    // (ex: silêncio prolongado), apenas reseta o estado visual.
+    if (isRecording) stopVoiceInput();
+  };
+
+  return rec;
+}
+
+function toggleVoiceInput() {
+  if (!SpeechRecognitionAPI) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Seu navegador não suporta entrada por voz. Use Chrome ou Edge no desktop/Android.</span>`);
+    return;
+  }
+  if (isRecording) {
+    stopVoiceInput();
+  } else {
+    startVoiceInput();
+  }
+}
+
+function startVoiceInput() {
+  if (!recognition) recognition = initSpeechRecognition();
+  if (!recognition) return;
+
+  const input = document.getElementById('chatInput');
+  baseTextBeforeRecording = input.value.trim();
+
+  try {
+    recognition.start();
+    isRecording = true;
+    const micBtn = document.getElementById('micBtn');
+    micBtn.classList.add('recording');
+    micBtn.title = 'Parar gravação';
+    input.placeholder = '🎙️ Ouvindo... fale agora';
+  } catch (e) {
+    console.warn('[Voz] Não foi possível iniciar:', e);
+  }
+}
+
+function stopVoiceInput() {
+  isRecording = false;
+  if (recognition) {
+    try { recognition.stop(); } catch (e) {}
+  }
+  const micBtn = document.getElementById('micBtn');
+  micBtn.classList.remove('recording');
+  micBtn.title = 'Falar (entrada por voz)';
+  const input = document.getElementById('chatInput');
+  input.placeholder = mode === 'rag'
+    ? 'Pergunte sobre os documentos carregados...'
+    : 'Pergunte qualquer coisa sobre vacinas e imunização...';
+}
+
+// Some navegadores/SOs sem suporte: esconde o botão de microfone
+if (!SpeechRecognitionAPI) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const micBtn = document.getElementById('micBtn');
+    if (micBtn) micBtn.style.display = 'none';
+  });
 }
 
 
