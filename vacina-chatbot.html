@@ -469,18 +469,10 @@
     text-align: center;
   }
 
-  .welcome-logo-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: var(--accent-green);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    margin-bottom: 16px;
-  }
+  .welcome-logo {
+  width: 50px; /* ajusta o tamanho */
+  margin-bottom: 5px;
+}
 
   .welcome-headline {
     font-size: 22px;
@@ -901,7 +893,7 @@
 <!-- Admin Password Modal -->
 <div class="modal-overlay hidden" id="adminModal">
   <div class="modal-card-chatgpt">
-    <h3>Área Restrita</h3>
+    <h3><i class="fa-solid fa-lock"></i> Área Restrita</h3>
     <p>Esta configuração é protegida. Insira a senha de administrador para continuar.</p>
     <input type="password" class="input-field-chatgpt" id="adminPasswordInput" placeholder="Senha de administrador..." autocomplete="off" />
     <div id="adminError" class="error-alert-chatgpt" style="display:none">⚠️ Senha incorreta.</div>
@@ -1086,6 +1078,7 @@
   <!-- Messages Stream -->
   <div class="chat-messages-container" id="messages">
     <div class="welcome-viewport">
+      <img src="assets/simbolo.png" alt="Logo" class="welcome-logo">
       <h2 class="welcome-headline">Como posso te ajudar hoje?</h2>
       
       <div class="suggestions-grid">
@@ -1112,7 +1105,7 @@
   <!-- Input Dock -->
   <div class="input-container-chatgpt">
     <div class="input-capsule-wrapper">
-      <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="<!-- Funcionalidade será adcionada futuramente -->" title="Adcione alguma arquivo"><i class="fa-solid fa-plus"></i> </button>
+      <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="<!-- Funcionalidade será adcionada futuramente -->" title="FUNCIONALIDADE EM BREVE"><i class="fa-solid fa-plus"></i> </button>
       <textarea
         class="chatgpt-textarea"
         id="chatInput"
@@ -1648,7 +1641,8 @@ function startNewChat() {
   const container = document.getElementById('messages');
   container.innerHTML = `
     <div class="welcome-viewport">
-      <h2 class="welcome-headline">Como posso ajudar com os protocolos de imunização hoje?</h2>
+      <img src="assets/simbolo.png" alt="Logo" class="welcome-logo">
+      <h2 class="welcome-headline">Como posso te ajudar hoje?</h2>
       <div class="suggestions-grid">
         <div class="suggestion-card" onclick="quickAsk('Quais vacinas precisam de reforço e qual é o intervalo recomendado?')">
           <div class="suggestion-title">Esquemas de reforço</div>
