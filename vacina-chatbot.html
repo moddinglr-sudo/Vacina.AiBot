@@ -907,26 +907,26 @@
 <!-- API Key & Provider Modal -->
 <div class="modal-overlay hidden" id="apiModal">
   <div class="modal-card-chatgpt">
-    <h3>🔑 Provedores de IA</h3>
+    <h3><i class="fa-solid fa-key"></i> Provedores de IA</h3>
     <p>Escolha o modelo e insira a chave de API que será <strong style="color:var(--accent-green)">salva localmente</strong>.</p>
 
     <div class="provider-grid-chatgpt">
       <button id="providerAnthropicBtn" class="provider-btn-chatgpt" onclick="selectProvider('anthropic')">
-        🤖 Claude (Anthropic)
+        Claude (Anthropic)
       </button>
       <button id="providerOpenaiBtn" class="provider-btn-chatgpt" onclick="selectProvider('openai')">
-        💬 GPT-4o (OpenAI)
+        GPT-4o (OpenAI)
       </button>
       <button id="providerMistralBtn" class="provider-btn-chatgpt" onclick="selectProvider('mistral')">
-        🌊 Mistral AI
+        Mistral AI
       </button>
       <button id="providerOllamaBtn" class="provider-btn-chatgpt" onclick="selectProvider('ollama')">
-        🦙 Ollama Local
+        Ollama Local
       </button>
     </div>
 
     <div id="savedKeyBanner" style="display:none;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--success)">
-      ✅ Chave configurada neste navegador.
+      <i class="fa-solid fa-check"></i> Chave configurada neste navegador.
     </div>
 
     <div id="apiKeySection">
@@ -949,11 +949,11 @@
       Obtenha sua chave em: console.anthropic.com
     </div>
 
-    <div id="apiError" class="error-alert-chatgpt" style="display:none">⚠️ <span></span></div>
+    <div id="apiError" class="error-alert-chatgpt" style="display:none"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></div>
     <div class="modal-actions-chatgpt">
-      <button class="btn-secondary-chatgpt" onclick="forgetApiKey()">🗑 Esquecer</button>
-      <button class="btn-secondary-chatgpt" onclick="closeModal()">Fechar</button>
-      <button class="btn-primary-chatgpt" onclick="saveApiKey()">💾 Salvar</button>
+      <button class="btn-secondary-chatgpt" onclick="forgetApiKey()"><i class="fa-solid fa-trash-can"></i> Esquecer</button>
+      <button class="btn-secondary-chatgpt" onclick="closeModal()"><i class="fa-solid fa-xmark"></i> Fechar</button>
+      <button class="btn-primary-chatgpt" onclick="saveApiKey()"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
     </div>
   </div>
 </div>
