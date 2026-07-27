@@ -1900,7 +1900,9 @@ async function sendMessage() {
   if (imageToSend) {
     userHtml += `${escapedQuery ? '<br>' : ''}<img src="${imageToSend.dataUrl}" style="max-width:200px;border-radius:8px;margin-top:6px;display:block" />`;
   }
-  // PDF anexado não aparece na mensagem do usuário nem é mencionado no chat
+  if (pdfToSend) {
+    userHtml += `${escapedQuery ? '<br>' : ''}<span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-secondary,rgba(0,0,0,0.08));border-radius:8px;padding:6px 10px;margin-top:6px"><i class="fa-solid fa-file-pdf" style="color:#e5484d"></i> ${pdfToSend.name.replace(/</g, '&lt;')}</span>`;
+  }
   if (userHtml) addMessage('user', userHtml);
 
   isLoading = true;
