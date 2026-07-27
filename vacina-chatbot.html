@@ -1658,17 +1658,18 @@ function getRelevantContext(query, topK = 6) {
 // ── UI RENDERERS & STATS ──
 function renderPdfList() {
   const list = document.getElementById('pdfList');
-  const count = documents.filter(d => d.status === 'ready').length;
+  const permanentDocs = documents.filter(d => !d.temporary);
+  const count = permanentDocs.filter(d => d.status === 'ready').length;
 
   const headerBadge = document.getElementById('headerDocBadge');
   if (headerBadge) headerBadge.textContent = count;
 
-  if (documents.length === 0) {
+  if (permanentDocs.length === 0) {
     list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px;text-align:center">Nenhum documento carregado</div>';
     return;
   }
 
-  list.innerHTML = documents.map(doc => `
+  list.innerHTML = permanentDocs.map(doc => `
     <div class="pdf-item-chatgpt">
       <span style="font-size:14px"><i class="fa-solid fa-file-circle-check"></i></span>
       <span class="pdf-name-text" title="${doc.name}">${doc.name}</span>
@@ -1678,8 +1679,9 @@ function renderPdfList() {
 }
 
 function updateStats() {
-  document.getElementById('statDocs').textContent = documents.filter(d => d.status === 'ready').length;
-  document.getElementById('statChunks').textContent = documents.reduce((acc, d) => acc + (d.chunks?.length || 0), 0);
+  const permanentDocs = documents.filter(d => !d.temporary);
+  document.getElementById('statDocs').textContent = permanentDocs.filter(d => d.status === 'ready').length;
+  document.getElementById('statChunks').textContent = permanentDocs.reduce((acc, d) => acc + (d.chunks?.length || 0), 0);
   document.getElementById('statMsgs').textContent = msgCount;
   document.getElementById('statKb').textContent = totalKb;
 }
@@ -1706,6 +1708,10 @@ function removeDoc(id) {
 
 function startNewChat() {
   chatHistory = [];
+  documents = documents.filter(d => !d.temporary);
+  removePendingImage();
+  renderPdfList();
+  updateStats();
   closeAllDrawers();
   const container = document.getElementById('messages');
   container.innerHTML = `
@@ -2087,7 +2093,6 @@ async function handlePdfAttachment(file) {
     docObj.text = text;
     docObj.chunks = chunkText(text);
     docObj.status = 'ready';
-    totalKb += Math.round(file.size / 1024);
     renderPdfList();
     updateStats();
 
