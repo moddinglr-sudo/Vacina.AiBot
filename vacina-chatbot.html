@@ -1149,8 +1149,10 @@
       <div class="input-area">
       <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="toggleMenu(event)" title="Anexar arquivos"> <i class="fa-solid fa-plus"></i></button>
         <input type="file" id="imageFileInput" accept="image/*" style="display: none;" onchange="handleImageFile(event)" />
+        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageFile(event)" />
       <div id="attachMenu" class="attach-menu">
-          <div class="menu-item" onclick="triggerImageUpload()"><i class="fa-solid fa-image"></i> Enviar foto/imagem </div>
+          <div class="menu-item" onclick="triggerCameraCapture()"><i class="fa-solid fa-camera"></i> Tirar foto </div>
+          <div class="menu-item" onclick="triggerImageUpload()"><i class="fa-solid fa-image"></i> Escolher da galeria </div>
       </div>
   </div>
       <textarea
@@ -1986,6 +1988,12 @@ function triggerImageUpload() {
   const menu = document.getElementById('attachMenu');
   if (menu) menu.style.display = 'none';
   document.getElementById('imageFileInput').click();
+}
+
+function triggerCameraCapture() {
+  const menu = document.getElementById('attachMenu');
+  if (menu) menu.style.display = 'none';
+  document.getElementById('cameraFileInput').click();
 }
 
 function readFileAsDataUrl(file) {
