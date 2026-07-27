@@ -52,10 +52,10 @@ pasta/
 // Body esperado:
 // { provider, model, apiKey, messages, systemPrompt }
 app.post('/api/chat', async (req, res) => {
-  const { provider, model, apiKey, messages, systemPrompt } = req.body
+  const { provider, model, apiKey, messages, systemPrompt, image } = req.body
 
   console.log(`\n📨 [${provider?.toUpperCase()}] modelo: ${model}`)
-  console.log(`   Mensagens: ${messages?.length || 0} | System: ${systemPrompt ? 'sim' : 'não'}`)
+  console.log(`   Mensagens: ${messages?.length || 0} | System: ${systemPrompt ? 'sim' : 'não'} | Imagem: ${image ? 'sim' : 'não'}`)
 
   try {
     let resposta = ''
@@ -144,10 +144,31 @@ app.post('/api/chat', async (req, res) => {
 
     // ── MISTRAL ──
     } else if (provider === 'mistral') {
-      const mistralMessages = [
-        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-        ...(messages || [])
-      ]
+      let mistralMessages
+
+      if (image) {
+        // Requisição com imagem (vision): anexa a imagem à última mensagem do usuário
+        const priorMessages = (messages || []).slice(0, -1)
+        const lastMsg = (messages || [])[(messages || []).length - 1]
+        const userText = (lastMsg && lastMsg.content) || 'Descreva esta imagem.'
+
+        mistralMessages = [
+          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+          ...priorMessages,
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userText },
+              { type: 'image_url', image_url: { url: image } }
+            ]
+          }
+        ]
+      } else {
+        mistralMessages = [
+          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+          ...(messages || [])
+        ]
+      }
 
       const mistralRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -156,7 +177,7 @@ app.post('/api/chat', async (req, res) => {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: model || 'mistral-large-latest',
+          model: model || (image ? 'mistral-small-latest' : 'mistral-large-latest'),
           max_tokens: 4096,
           messages: mistralMessages
         })
