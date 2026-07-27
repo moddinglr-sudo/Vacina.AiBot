@@ -1148,11 +1148,11 @@
       </div>
       <div class="input-area">
       <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="toggleMenu(event)" title="Anexar arquivos"> <i class="fa-solid fa-plus"></i></button>
-        <input type="file" id="imageFileInput" accept="image/*" style="display: none;" onchange="handleImageFile(event)" />
-        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageFile(event)" />
+        <input type="file" id="imageFileInput" accept="image/*,.pdf,application/pdf" style="display: none;" onchange="handleAttachedFile(event)" />
+        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;" onchange="handleAttachedFile(event)" />
       <div id="attachMenu" class="attach-menu">
           <div class="menu-item" onclick="triggerCameraCapture()"><i class="fa-solid fa-camera"></i> Tirar foto </div>
-          <div class="menu-item" onclick="triggerImageUpload()"><i class="fa-solid fa-image"></i> Escolher da galeria </div>
+          <div class="menu-item" onclick="triggerImageUpload()"><i class="fa-solid fa-paperclip"></i> Anexar imagem ou PDF </div>
       </div>
   </div>
       <textarea
@@ -2005,14 +2005,26 @@ function readFileAsDataUrl(file) {
   });
 }
 
-async function handleImageFile(event) {
+async function handleAttachedFile(event) {
   const file = event.target.files[0];
   event.target.value = ''; // permite selecionar o mesmo arquivo de novo depois
 
   if (!file) return;
 
-  if (!file.type.startsWith('image/')) {
-    addMessage('bot', `<span style="color:var(--danger)">⚠️ Selecione um arquivo de imagem (JPG, PNG, etc.).</span>`);
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isImage = file.type.startsWith('image/');
+
+  if (!isPdf && !isImage) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Selecione uma imagem ou um arquivo PDF.</span>`);
+    return;
+  }
+
+  if (isPdf) {
+    if (file.size > 30 * 1024 * 1024) {
+      addMessage('bot', `<span style="color:var(--danger)">⚠️ PDF muito grande (máx. 30MB).</span>`);
+      return;
+    }
+    handlePdfAttachment(file);
     return;
   }
 
@@ -2040,6 +2052,56 @@ async function handleImageFile(event) {
   showImagePreview();
   const input = document.getElementById('chatInput');
   if (input) input.focus();
+}
+
+async function handlePdfAttachment(file) {
+  let buffer;
+  try {
+    buffer = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = rej;
+      reader.readAsArrayBuffer(file);
+    });
+  } catch (e) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Não foi possível ler o arquivo PDF.</span>`);
+    return;
+  }
+
+  // PDF anexado no chat: usado só como contexto desta conversa, NÃO exige senha de admin
+  // e NÃO é salvo permanentemente na base de documentos (isso continua exigindo admin, no painel "Documentos").
+  addMessage('user', `📄 ${file.name.replace(/</g, '&lt;')}`);
+
+  const id = Date.now() + Math.random();
+  const docObj = { id, name: file.name, text: '', chunks: [], size: file.size, status: 'processing', temporary: true };
+  documents.push(docObj);
+  renderPdfList();
+  updateStats();
+
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  addTyping();
+
+  try {
+    const text = await parsePdfBuffer(buffer);
+    docObj.text = text;
+    docObj.chunks = chunkText(text);
+    docObj.status = 'ready';
+    totalKb += Math.round(file.size / 1024);
+    renderPdfList();
+    updateStats();
+
+    removeTyping();
+    addMessage('bot', `✅ PDF <b>${file.name.replace(/</g, '&lt;')}</b> carregado nesta conversa. Já pode perguntar sobre o conteúdo dele.`);
+  } catch (err) {
+    docObj.status = 'error';
+    renderPdfList();
+    removeTyping();
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Erro ao processar o PDF: ${err.message}</span>`);
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
 }
 
 function showImagePreview() {
