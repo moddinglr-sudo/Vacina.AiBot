@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Vacina.Ai — Alto Padrão Laboratório</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💉</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22></text></svg>">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
@@ -975,7 +975,7 @@
         <option value="mistral">mistral — Português BR</option>
       </select>
       <button onclick="testOllama()" class="btn-secondary-chatgpt" style="width:100%;font-size:11px">
-        🔌 Testar Conexão Ollama
+        <i class="fa-solid fa-plug-circle-plus"></i> Testar Conexão Ollama
       </button>
       <div id="ollamaTestResult" style="display:none;margin-top:6px;font-size:11px;padding:6px"></div>
     </div>
@@ -1140,10 +1140,17 @@
   <!-- Input Dock -->
   <div class="input-container-chatgpt">
     <div class="input-capsule-wrapper">
+      <div id="imagePreviewChip" style="display:none;align-items:center;gap:0;margin:0 8px 6px 8px;width:fit-content">
+        <div style="position:relative;display:inline-block">
+          <img id="imagePreviewThumb" src="" alt="preview" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color,rgba(0,0,0,0.1))" />
+          <button type="button" onclick="removePendingImage()" title="Remover imagem" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--text-primary,#333);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">✕</button>
+        </div>
+      </div>
       <div class="input-area">
-  <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="toggleMenu(event)" title="Anexar arquivos"> <i class="fa-solid fa-plus"></i></button>
+      <button class="btn-circle-action btn-mic-chatgpt" id="addBtn" onclick="toggleMenu(event)" title="Anexar arquivos"> <i class="fa-solid fa-plus"></i></button>
+        <input type="file" id="imageFileInput" accept="image/*" style="display: none;" onchange="handleImageFile(event)" />
       <div id="attachMenu" class="attach-menu">
-          <div class="menu-item"><i class="fa-solid fa-paperclip"></i> Adicionar arquivo </div>
+          <div class="menu-item" onclick="triggerImageUpload()"><i class="fa-solid fa-image"></i> Enviar foto/imagem </div>
       </div>
   </div>
       <textarea
@@ -1847,9 +1854,17 @@ async function sendMessage() {
 
   const input = document.getElementById('chatInput');
   const query = input.value.trim();
-  if (!query) return;
+  const imageToSend = pendingImage;
 
-  if (!getCurrentKey() && apiProvider !== 'ollama') {
+  if (!query && !imageToSend) return;
+
+  if (!imageToSend && !getCurrentKey() && apiProvider !== 'ollama') {
+    openModal();
+    return;
+  }
+
+  if (imageToSend && !apiKeys.mistral) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Configure sua chave da API Mistral em "Configurações" para analisar imagens.</span>`);
     openModal();
     return;
   }
@@ -1857,29 +1872,45 @@ async function sendMessage() {
   input.value = '';
   input.style.height = '';
   msgCount++;
+  removePendingImage();
 
-  addMessage('user', query.replace(/</g, '&lt;'));
+  const escapedQuery = query ? query.replace(/</g, '&lt;') : '';
+  let userHtml = escapedQuery;
+  if (imageToSend) {
+    userHtml += `${escapedQuery ? '<br>' : ''}<img src="${imageToSend.dataUrl}" style="max-width:200px;border-radius:8px;margin-top:6px;display:block" />`;
+  }
+  addMessage('user', userHtml);
 
   isLoading = true;
   document.getElementById('sendBtn').disabled = true;
   addTyping();
 
   try {
-    const { context, sources } = getRelevantContext(query);
-    const response = await callClaude(query, context);
-    removeTyping();
+    if (imageToSend) {
+      const response = await analyzeImageWithMistral(imageToSend.dataUrl, apiKeys.mistral, query);
+      removeTyping();
+      addMessage('bot', formatBotResponse(response));
 
-    let html = formatBotResponse(response);
-    if (sources.length > 0) {
-      const sourceTags = sources.map(s => `<span class="source-tag-chatgpt">📄 ${s.replace('.pdf','')}</span>`).join('');
-      html += `<div class="rag-sources-footer"><span style="font-size:11px;color:var(--text-muted);width:100%">Fontes consultadas:</span>${sourceTags}</div>`;
+      chatHistory.push({ role: 'user', content: query ? `${query} [Imagem enviada: ${imageToSend.name}]` : `[Imagem enviada: ${imageToSend.name}]` });
+      chatHistory.push({ role: 'assistant', content: response });
+      if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+    } else {
+      const { context, sources } = getRelevantContext(query);
+      const response = await callClaude(query, context);
+      removeTyping();
+
+      let html = formatBotResponse(response);
+      if (sources.length > 0) {
+        const sourceTags = sources.map(s => `<span class="source-tag-chatgpt">📄 ${s.replace('.pdf','')}</span>`).join('');
+        html += `<div class="rag-sources-footer"><span style="font-size:11px;color:var(--text-muted);width:100%">Fontes consultadas:</span>${sourceTags}</div>`;
+      }
+
+      addMessage('bot', html);
+
+      chatHistory.push({ role: 'user', content: query });
+      chatHistory.push({ role: 'assistant', content: response });
+      if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
     }
-
-    addMessage('bot', html);
-
-    chatHistory.push({ role: 'user', content: query });
-    chatHistory.push({ role: 'assistant', content: response });
-    if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
 
   } catch (err) {
     removeTyping();
@@ -1935,6 +1966,101 @@ async function callClaude(query, context) {
       apiKey: getCurrentKey(),
       messages,
       systemPrompt
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.response || `Servidor HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (data.response?.startsWith('Erro:')) throw new Error(data.response);
+  return data.response || 'Sem resposta.';
+}
+
+// ── UPLOAD DE IMAGEM (análise via Mistral Vision) ──
+let pendingImage = null; // { dataUrl, name }
+
+function triggerImageUpload() {
+  const menu = document.getElementById('attachMenu');
+  if (menu) menu.style.display = 'none';
+  document.getElementById('imageFileInput').click();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => res(e.target.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleImageFile(event) {
+  const file = event.target.files[0];
+  event.target.value = ''; // permite selecionar o mesmo arquivo de novo depois
+
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Selecione um arquivo de imagem (JPG, PNG, etc.).</span>`);
+    return;
+  }
+
+  if (file.size > 15 * 1024 * 1024) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Imagem muito grande (máx. 15MB).</span>`);
+    return;
+  }
+
+  if (!apiKeys.mistral) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Configure sua chave da API Mistral em "Configurações" para analisar imagens.</span>`);
+    openModal();
+    return;
+  }
+
+  let dataUrl;
+  try {
+    dataUrl = await readFileAsDataUrl(file);
+  } catch (e) {
+    addMessage('bot', `<span style="color:var(--danger)">⚠️ Não foi possível ler o arquivo de imagem.</span>`);
+    return;
+  }
+
+  // Apenas anexa - o envio acontece quando o usuário clicar em enviar
+  pendingImage = { dataUrl, name: file.name };
+  showImagePreview();
+  const input = document.getElementById('chatInput');
+  if (input) input.focus();
+}
+
+function showImagePreview() {
+  if (!pendingImage) return;
+  document.getElementById('imagePreviewThumb').src = pendingImage.dataUrl;
+  document.getElementById('imagePreviewChip').style.display = 'flex';
+}
+
+function removePendingImage() {
+  pendingImage = null;
+  const chip = document.getElementById('imagePreviewChip');
+  if (chip) chip.style.display = 'none';
+  const thumb = document.getElementById('imagePreviewThumb');
+  if (thumb) thumb.src = '';
+}
+
+async function analyzeImageWithMistral(dataUrl, apiKey, userQuestion) {
+  const systemPrompt = `Você é o Vacina.Ai. O usuário enviou uma foto/imagem (por exemplo, um cartão de vacinação, rótulo de imunobiológico, ou documento). Identifique do que se trata a imagem e descreva de forma clara e objetiva as informações relevantes visíveis (vacinas, datas, lotes, doses, nomes, etc.), em português do Brasil. Se o usuário fizer uma pergunta específica sobre a imagem, responda diretamente a ela. Se a imagem não tiver relação com vacinação, apenas descreva o que você identifica nela.`;
+
+  const response = await fetch('https://vacina-aibot.onrender.com/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: 'mistral',
+      model: 'mistral-small-latest',
+      apiKey,
+      image: dataUrl,
+      systemPrompt,
+      messages: [{ role: 'user', content: userQuestion && userQuestion.trim() ? userQuestion.trim() : 'Identifique e descreva o que há nesta imagem.' }]
     })
   });
 
