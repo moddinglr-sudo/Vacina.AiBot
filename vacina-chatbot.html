@@ -147,6 +147,17 @@
     transition: background 0.15s ease, color 0.15s ease;
   }
   .quick-prompt-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+  .history-clear-btn { margin-left: auto; background: none; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; }
+  .history-item { width: 100%; border: 1px solid var(--border-color); background: transparent; border-radius: var(--radius-sm); padding: 10px; text-align: left; color: var(--text-primary); cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+  .history-item:hover { background: var(--bg-surface-hover); border-color: var(--accent-green); }
+  .history-item-title { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--text-muted); font-size: 10px; }
+  .history-status { border-radius: 99px; padding: 2px 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .history-status.review { color: #a16207; background: rgba(245, 158, 11, .14); }
+  .history-status.confirmed { color: #047857; background: rgba(16, 185, 129, .14); }
+  .history-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .history-action { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 10px; padding: 0; }
+  .history-action:hover { color: var(--accent-green); }
   .input-area { position: relative; }
   .attach-menu {
     position: absolute;
@@ -585,19 +596,8 @@
   </div>
   <div class="sidebar-scroll">
     <div>
-      <div class="sidebar-section-title">Dúvidas Frequentes</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas precisam de reforço e com qual intervalo?')"><i class="fa-regular fa-square-check"></i> Esquemas de reforço</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Como interpretar um cartão de vacinas com doses em atraso?')"><i class="fa-regular fa-square-check"></i> Doses em atraso</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais são as contraindicações absolutas para vacinação?')"><i class="fa-regular fa-square-check"></i> Contraindicações</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas podem ser administradas simultaneamente?')"><i class="fa-regular fa-square-check"></i> Vacinação simultânea</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Qual a diferença entre vacinas atenuadas e inativadas?')"><i class="fa-regular fa-square-check"></i> Tipos de vacinas</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas fazem parte do calendário infantil do PNI?')"><i class="fa-regular fa-square-check"></i> Calendário infantil</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas são indicadas para gestantes?')"><i class="fa-regular fa-square-check"></i> Vacinas na gestação</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas um adulto precisa manter atualizadas?')"><i class="fa-regular fa-square-check"></i> Vacinação do adulto</div>
-      <div class="quick-prompt-item" onclick="quickAsk('O que fazer em caso de reação adversa à vacina?')"><i class="fa-regular fa-square-check"></i> Reações adversas</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Quais vacinas são contraindicadas para imunossuprimidos?')"><i class="fa-regular fa-square-check"></i> Imunossuprimidos</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Qual o intervalo mínimo entre diferentes vacinas?')"><i class="fa-regular fa-square-check"></i> Intervalos vacinais</div>
-      <div class="quick-prompt-item" onclick="quickAsk('Vacinas podem ser aplicadas fora do prazo?')"><i class="fa-regular fa-square-check"></i> Atrasos vacinais</div>
+      <div class="sidebar-section-title" style="display:flex;align-items:center"><span>Histórico local</span><button class="history-clear-btn" onclick="clearHistory()">Limpar</button></div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
   </div>
   <div class="sidebar-bottom">
@@ -786,15 +786,19 @@ document.getElementById('adminPasswordInput').addEventListener('keydown', e => {
 
 // INDEXEDDB
 const DB_NAME = 'vaccinabot_db';
-const DB_VER  = 1;
+const DB_VER  = 2;
 const STORE   = 'documentos';
+const HISTORY_STORE = 'historico';
 let db = null;
+let historyEntries = [];
+let currentHistoryId = null;
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
+      if (!d.objectStoreNames.contains(HISTORY_STORE)) d.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
     };
     req.onsuccess = e => { db = e.target.result; resolve(db); };
     req.onerror   = e => reject(e.target.error);
@@ -835,6 +839,102 @@ async function loadSavedDocs() {
     totalKb = saved.reduce((acc, d) => acc + Math.round((d.size || 0) / 1024), 0);
     renderPdfList(); updateStats();
   } catch(e) {}
+}
+async function dbSaveHistory(entry) {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readwrite');
+    tx.objectStore(HISTORY_STORE).put(entry);
+    tx.oncomplete = resolve; tx.onerror = e => reject(e.target.error);
+  });
+}
+async function dbDeleteHistory(id) {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readwrite');
+    tx.objectStore(HISTORY_STORE).delete(id);
+    tx.oncomplete = resolve; tx.onerror = e => reject(e.target.error);
+  });
+}
+async function dbLoadHistory() {
+  if (!db) await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HISTORY_STORE, 'readonly');
+    const req = tx.objectStore(HISTORY_STORE).getAll();
+    req.onsuccess = e => resolve(e.target.result || []); req.onerror = e => reject(e.target.error);
+  });
+}
+function historyTitle(messages) {
+  const first = messages.find(message => message.role === 'user')?.content || 'Nova análise';
+  if (/\[Imagem enviada:|carteir|cartão/i.test(first)) return `Carteirinha — ${new Date().toLocaleDateString('pt-BR')}`;
+  return first.replace(/\s+/g, ' ').slice(0, 52) || 'Nova análise';
+}
+async function persistCurrentHistory() {
+  if (!chatHistory.length) return;
+  const existing = historyEntries.find(entry => entry.id === currentHistoryId);
+  const entry = {
+    id: currentHistoryId || crypto.randomUUID(),
+    title: existing?.title || historyTitle(chatHistory),
+    createdAt: existing?.createdAt || Date.now(),
+    updatedAt: Date.now(),
+    status: existing?.status || 'review',
+    messages: chatHistory.map(message => ({ role: message.role, content: String(message.content).slice(0, 20_000) }))
+  };
+  currentHistoryId = entry.id;
+  await dbSaveHistory(entry);
+  historyEntries = [entry, ...historyEntries.filter(item => item.id !== entry.id)].slice(0, 100);
+  renderHistoryList();
+}
+function formatHistoryDate(value) {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+function renderHistoryList() {
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  if (!historyEntries.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px">Nenhuma análise salva neste navegador.</div>';
+    return;
+  }
+  const entries = [...historyEntries].sort((a, b) => b.updatedAt - a.updatedAt);
+  list.innerHTML = entries.map(entry => {
+    const confirmed = entry.status === 'confirmed';
+    return `<div class="history-item" onclick="openHistory('${entry.id}')">
+      <span class="history-item-title">${escapeHtml(entry.title)}</span>
+      <span class="history-item-meta">${escapeHtml(formatHistoryDate(entry.updatedAt))}<span class="history-status ${confirmed ? 'confirmed' : 'review'}">${confirmed ? 'Confirmada' : 'Em revisão'}</span></span>
+      <span class="history-actions"><button class="history-action" onclick="event.stopPropagation(); setHistoryStatus('${entry.id}', '${confirmed ? 'review' : 'confirmed'}')">${confirmed ? 'Reabrir' : 'Confirmar'}</button><button class="history-action" onclick="event.stopPropagation(); deleteHistory('${entry.id}')">Apagar</button></span>
+    </div>`;
+  }).join('');
+}
+async function loadHistory() {
+  try { historyEntries = await dbLoadHistory(); renderHistoryList(); } catch (error) { console.error('Não foi possível carregar o histórico', error); }
+}
+function openHistory(id) {
+  const entry = historyEntries.find(item => item.id === id);
+  if (!entry) return;
+  currentHistoryId = entry.id;
+  chatHistory = entry.messages || [];
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+  chatHistory.forEach(message => addMessage(message.role === 'user' ? 'user' : 'bot', message.role === 'user' ? escapeHtml(message.content) : formatBotResponse(message.content)));
+  closeAllDrawers();
+}
+async function setHistoryStatus(id, status) {
+  const entry = historyEntries.find(item => item.id === id);
+  if (!entry) return;
+  entry.status = status; entry.updatedAt = Date.now();
+  await dbSaveHistory(entry); renderHistoryList();
+}
+async function deleteHistory(id) {
+  if (!confirm('Apagar esta análise deste navegador?')) return;
+  await dbDeleteHistory(id);
+  historyEntries = historyEntries.filter(entry => entry.id !== id);
+  if (currentHistoryId === id) currentHistoryId = null;
+  renderHistoryList();
+}
+async function clearHistory() {
+  if (!historyEntries.length || !confirm('Apagar todo o histórico local? Esta ação não pode ser desfeita.')) return;
+  await Promise.all(historyEntries.map(entry => dbDeleteHistory(entry.id)));
+  historyEntries = []; currentHistoryId = null; renderHistoryList();
 }
 
 // DRAWERS
@@ -1101,6 +1201,7 @@ function removeDoc(id) {
 }
 function startNewChat() {
   chatHistory = [];
+  currentHistoryId = null;
   documents = documents.filter(d => !d.temporary);
   removePendingImage(); removePendingPdf();
   renderPdfList(); updateStats(); closeAllDrawers();
@@ -1280,6 +1381,7 @@ async function sendMessage() {
       chatHistory.push({ role: 'assistant', content: response });
       if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
     }
+    await persistCurrentHistory();
   } catch (err) {
     console.error('Erro no chat:', err);
     removeTyping();
@@ -1497,6 +1599,7 @@ function requestCardCorrection() {
 // Init
 selectProvider(apiProvider);
 loadSavedDocs();
+loadHistory();
 </script>
 </body>
 </html>
