@@ -5,14 +5,38 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
+app.disable('x-powered-by')
 app.use(express.json({ limit: '50mb' }))
 
+// Proteções básicas para a API pública. Conteúdo e chaves não são registrados.
+const requestBuckets = new Map()
+const RATE_WINDOW_MS = 60_000
+const RATE_LIMIT = 30
+app.use('/api', (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown'
+  const now = Date.now()
+  const bucket = (requestBuckets.get(ip) || []).filter(time => now - time < RATE_WINDOW_MS)
+  if (bucket.length >= RATE_LIMIT) return res.status(429).json({ response: 'Muitas solicitações. Aguarde um minuto e tente novamente.' })
+  bucket.push(now); requestBuckets.set(ip, bucket)
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Referrer-Policy', 'same-origin')
+  next()
+})
+
 // ── CORS ──
+// A interface é entregue pelo mesmo servidor. Não abra esta API para qualquer site,
+// pois o navegador poderia encaminhar a chave local do usuário a partir de uma origem não confiável.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key')
-  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean)
+  const origin = req.headers.origin
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key')
+  }
+  if (req.method === 'OPTIONS') return origin && allowedOrigins.includes(origin) ? res.sendStatus(204) : res.sendStatus(403)
   next()
 })
 
@@ -52,11 +76,20 @@ pasta/
 // Body esperado:
 // { provider, model, apiKey, messages, systemPrompt }
 app.post('/api/chat', async (req, res) => {
-  const { provider, model, apiKey, messages, systemPrompt, image, images } = req.body
+  const { provider, model, apiKey, messages, systemPrompt, image } = req.body
+
+  if (!['ollama', 'anthropic', 'openai', 'mistral'].includes(provider)) {
+    return res.status(400).json({ response: 'Provedor inválido.' })
+  }
+  if (!Array.isArray(messages) || messages.length > 40 || !messages.every(m => ['user', 'assistant'].includes(m?.role) && typeof m.content === 'string' && m.content.length <= 20_000)) {
+    return res.status(400).json({ response: 'Formato ou tamanho de conversa inválido.' })
+  }
+  if (typeof systemPrompt !== 'string' || systemPrompt.length > 50_000 || (image && (typeof image !== 'string' || image.length > 22_000_000))) {
+    return res.status(400).json({ response: 'Conteúdo excede o limite permitido.' })
+  }
 
   console.log(`\n📨 [${provider?.toUpperCase()}] modelo: ${model}`)
-  const imgCount = (Array.isArray(images) ? images.length : 0) + (image ? 1 : 0)
-  console.log(`   Mensagens: ${messages?.length || 0} | System: ${systemPrompt ? 'sim' : 'não'} | Imagens: ${imgCount}`)
+  console.log(`   Mensagens: ${messages?.length || 0} | System: ${systemPrompt ? 'sim' : 'não'} | Imagem: ${image ? 'sim' : 'não'}`)
 
   try {
     let resposta = ''
@@ -146,13 +179,12 @@ app.post('/api/chat', async (req, res) => {
     // ── MISTRAL ──
     } else if (provider === 'mistral') {
       let mistralMessages
-      const imageList = Array.isArray(images) && images.length ? images : (image ? [image] : [])
 
-      if (imageList.length) {
-        // Requisição com imagem(ns) (vision): anexa à última mensagem do usuário
+      if (image) {
+        // Requisição com imagem (vision): anexa a imagem à última mensagem do usuário
         const priorMessages = (messages || []).slice(0, -1)
         const lastMsg = (messages || [])[(messages || []).length - 1]
-        const userText = (lastMsg && lastMsg.content) || 'Descreva estas imagens.'
+        const userText = (lastMsg && lastMsg.content) || 'Descreva esta imagem.'
 
         mistralMessages = [
           ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
@@ -161,7 +193,7 @@ app.post('/api/chat', async (req, res) => {
             role: 'user',
             content: [
               { type: 'text', text: userText },
-              ...imageList.map(img => ({ type: 'image_url', image_url: { url: img } }))
+              { type: 'image_url', image_url: { url: image } }
             ]
           }
         ]
@@ -179,7 +211,7 @@ app.post('/api/chat', async (req, res) => {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: model || (imageList.length ? 'mistral-small-latest' : 'mistral-large-latest'),
+          model: model || (image ? 'mistral-small-latest' : 'mistral-large-latest'),
           max_tokens: 4096,
           messages: mistralMessages
         })
