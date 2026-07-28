@@ -158,6 +158,11 @@
   .history-actions { display: flex; gap: 8px; margin-top: 8px; }
   .history-action { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 10px; padding: 0; }
   .history-action:hover { color: var(--accent-green); }
+  .toast-container { position: fixed; right: 18px; bottom: 18px; z-index: 200; display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 36px)); pointer-events: none; }
+  .toast { display: flex; align-items: center; gap: 9px; padding: 11px 13px; background: var(--bg-main); color: var(--text-primary); border: 1px solid var(--border-color); border-left: 4px solid var(--success); box-shadow: 0 10px 24px rgba(0,0,0,.16); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.35; animation: toast-in .22s ease-out; }
+  .toast.info { border-left-color: var(--accent-blue); }
+  .toast.out { opacity: 0; transform: translateY(6px); transition: opacity .18s ease, transform .18s ease; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   .input-area { position: relative; }
   .attach-menu {
     position: absolute;
@@ -493,6 +498,7 @@
 </style>
 </head>
 <body>
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Admin Password Modal -->
 <div class="modal-overlay hidden" id="adminModal">
@@ -596,7 +602,7 @@
   </div>
   <div class="sidebar-scroll">
     <div>
-      <div class="sidebar-section-title" style="display:flex;align-items:center"><span>Recentes</span><button class="history-clear-btn" onclick="clearHistory()">Limpar</button></div>
+      <div class="sidebar-section-title" style="display:flex;align-items:center"><span>Histórico local</span><button class="history-clear-btn" onclick="clearHistory()">Limpar</button></div>
       <div id="historyList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
   </div>
@@ -680,7 +686,7 @@
     </div>
 
     <div class="chatgpt-disclaimer">
-      2026 © Alto Padrão Laboratório CNPJ: 12.377.868/0001-94
+      Não envie CPF, endereço ou outros dados pessoais. A análise é informativa e deve ser conferida por profissional habilitado.
     </div>
   </div>
 </main>
@@ -884,6 +890,7 @@ async function persistCurrentHistory() {
   await dbSaveHistory(entry);
   historyEntries = [entry, ...historyEntries.filter(item => item.id !== entry.id)].slice(0, 100);
   renderHistoryList();
+  showToast('Análise salva neste navegador.');
 }
 function formatHistoryDate(value) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
@@ -923,6 +930,7 @@ async function setHistoryStatus(id, status) {
   if (!entry) return;
   entry.status = status; entry.updatedAt = Date.now();
   await dbSaveHistory(entry); renderHistoryList();
+  showToast(status === 'confirmed' ? 'Registro confirmado.' : 'Registro reaberto para revisão.', 'info');
 }
 async function deleteHistory(id) {
   if (!confirm('Apagar esta análise deste navegador?')) return;
@@ -935,6 +943,7 @@ async function clearHistory() {
   if (!historyEntries.length || !confirm('Apagar todo o histórico local? Esta ação não pode ser desfeita.')) return;
   await Promise.all(historyEntries.map(entry => dbDeleteHistory(entry.id)));
   historyEntries = []; currentHistoryId = null; renderHistoryList();
+  showToast('Histórico apagado deste navegador.', 'info');
 }
 
 // DRAWERS
@@ -1291,6 +1300,25 @@ function addMessage(role, html) {
   container.scrollTop = container.scrollHeight;
   return body;
 }
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'info' ? 'info' : ''}`;
+  toast.innerHTML = `<i class="fa-solid ${type === 'info' ? 'fa-circle-info' : 'fa-circle-check'}"></i><span></span>`;
+  toast.querySelector('span').textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => { toast.classList.add('out'); setTimeout(() => toast.remove(), 220); }, 3200);
+}
+let processingTimers = [];
+function setProcessingStep(text) {
+  const label = document.getElementById('typingStep');
+  if (label) label.textContent = text;
+}
+function scheduleProcessingSteps(steps, interval = 1100) {
+  processingTimers.forEach(timer => clearTimeout(timer));
+  processingTimers = steps.map((step, index) => setTimeout(() => setProcessingStep(step), index * interval));
+}
 function addTyping() {
   const container = document.getElementById('messages');
   const div = document.createElement('div');
@@ -1305,12 +1333,16 @@ function addTyping() {
           <div class="typing-dot-chatgpt"></div>
           <div class="typing-dot-chatgpt"></div>
         </div>
+        <div id="typingStep" style="font-size:12px;color:var(--text-muted);margin-top:4px">Preparando análise…</div>
       </div>
     </div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
-function removeTyping() { const t = document.getElementById('typingMsg'); if (t) t.remove(); }
+function removeTyping() {
+  processingTimers.forEach(timer => clearTimeout(timer)); processingTimers = [];
+  const t = document.getElementById('typingMsg'); if (t) t.remove();
+}
 function formatBotResponse(text) {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -1352,15 +1384,19 @@ async function sendMessage() {
   addTyping();
   try {
     if (pdfToSend) {
+      setProcessingStep('Lendo PDF…');
       if (!pdfToSend.text) pdfToSend.text = await parsePdfBuffer(pdfToSend.buffer);
+      setProcessingStep('Identificando informações…');
       const pdfContext = truncateText(pdfToSend.text);
       const question = query || 'Resuma este PDF de forma breve e objetiva, destacando os principais pontos.';
+      setProcessingStep('Organizando resposta…');
       const response = await callClaude(question, pdfContext);
       removeTyping(); addMessage('bot', formatBotResponse(response));
       chatHistory.push({ role: 'user', content: question });
       chatHistory.push({ role: 'assistant', content: response });
       if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
     } else if (imageToSend) {
+      scheduleProcessingSteps(['Lendo imagem…', 'Identificando vacinas e datas…', 'Organizando informações para conferência…']);
       const response = await analyzeImageWithMistral(imageToSend.dataUrl, apiKeys.mistral, query);
       removeTyping();
       addMessage('bot', `${formatBotResponse(response)}<div class="review-card"><strong>Revise antes de usar</strong><p>Confirme os itens marcados como “baixa confiança”. Para avaliar pendências, informe data de nascimento e condições especiais relevantes.</p><button class="review-btn" onclick="requestCardCorrection()"><i class="fa-solid fa-pen"></i> Corrigir leitura</button></div><div class="clinical-note">A leitura é informativa. Não use uma imagem como única base para aplicação ou decisão clínica.</div>`);
@@ -1368,7 +1404,9 @@ async function sendMessage() {
       chatHistory.push({ role: 'assistant', content: response });
       if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
     } else {
+      setProcessingStep('Consultando documentos relevantes…');
       const { context, sources } = getRelevantContext(query);
+      setProcessingStep('Organizando resposta…');
       const response = await callClaude(query, context);
       removeTyping();
       let html = formatBotResponse(response);
