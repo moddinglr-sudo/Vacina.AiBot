@@ -300,6 +300,10 @@
     cursor: pointer;
     white-space: nowrap;
   }
+  .response-mode-switch { display: inline-flex; align-items: center; padding: 3px; border: 1px solid var(--border-color); border-radius: var(--radius-pill); background: var(--bg-surface); gap: 2px; }
+  .response-mode-label { font-size: 11px; color: var(--text-muted); padding: 0 5px 0 7px; white-space: nowrap; }
+  .response-mode-btn { border: none; border-radius: var(--radius-pill); background: transparent; color: var(--text-secondary); cursor: pointer; padding: 6px 9px; font-size: 11px; font-family: inherit; }
+  .response-mode-btn.active { background: var(--bg-main); color: var(--accent-green); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
   .badge-count { background: var(--accent-green); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; font-family: 'Space Mono', monospace; }
   .btn-icon-chatgpt { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; flex-shrink: 0; }
   .chat-messages-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; scroll-behavior: smooth; width: 100%; }
@@ -481,6 +485,8 @@
     .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 280px !important; box-shadow: 4px 0 24px rgba(0,0,0,0.3); transform: translateX(-100%); }
     .sidebar.open { transform: translateX(0); }
     .btn-pdf-toggle span:not(.badge-count) { display: none; }
+    .response-mode-label { display: none; }
+    .response-mode-btn { padding: 6px 7px; }
     .welcome-headline { font-size: 18px; }
     .suggestions-grid { grid-template-columns: 1fr; }
     .msg-row-chatgpt { padding: 10px 12px; }
@@ -622,6 +628,11 @@
       <button class="mobile-toggle" onclick="toggleSidebar()" title="Abrir menu"><i class="fa-solid fa-bars"></i></button>
     </div>
     <div class="header-right-group">
+      <div class="response-mode-switch" role="group" aria-label="Tamanho da resposta">
+        <span class="response-mode-label">Modo</span>
+        <button type="button" id="shortResponseBtn" class="response-mode-btn" onclick="setResponseMode('short')" aria-pressed="false">Curto</button>
+        <button type="button" id="detailedResponseBtn" class="response-mode-btn" onclick="setResponseMode('detailed')" aria-pressed="true">Detalhado</button>
+      </div>
       <button class="btn-pdf-toggle" onclick="togglePdfDrawer()" title="Abrir painel de documentos PDF">
         <i class="fa-solid fa-file"></i> <span>PDFs</span>
         <span class="badge-count" id="headerDocBadge">0</span>
@@ -732,6 +743,19 @@ function toggleTheme() {
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   applyTheme(saved || (prefersDark ? 'dark' : 'light'));
 })();
+
+// RESPONSE LENGTH PREFERENCE
+let responseMode = localStorage.getItem('vaccinabot_response_mode') || 'detailed';
+function setResponseMode(mode) {
+  responseMode = mode === 'short' ? 'short' : 'detailed';
+  localStorage.setItem('vaccinabot_response_mode', responseMode);
+  const shortButton = document.getElementById('shortResponseBtn');
+  const detailedButton = document.getElementById('detailedResponseBtn');
+  shortButton.classList.toggle('active', responseMode === 'short');
+  detailedButton.classList.toggle('active', responseMode === 'detailed');
+  shortButton.setAttribute('aria-pressed', String(responseMode === 'short'));
+  detailedButton.setAttribute('aria-pressed', String(responseMode === 'detailed'));
+}
 
 let documents = [];
 let chatHistory = [];
@@ -1430,6 +1454,9 @@ async function sendMessage() {
   updateStats();
 }
 function buildSystemPrompt(context) {
+  const outputLength = responseMode === 'short'
+    ? 'RESPOSTA CURTA: responda em até 6 linhas ou 4 tópicos. Para carteirinhas, mostre apenas os dados essenciais, pendências e próximo passo.'
+    : 'RESPOSTA DETALHADA: explique de forma organizada, usando títulos e tópicos quando ajudar. Para carteirinhas, inclua todos os campos legíveis, confiança, pendências e próximo passo.';
   return `Você é o Vacina.Ai, assistente informativo para técnicos de imunização.
 
 REGRAS DE SEGURANÇA
@@ -1445,6 +1472,8 @@ Forneça informação educacional baseada em PNI/Ministério da Saúde quando po
 
 PARA DOCUMENTOS E CARTEIRINHAS
 Use apenas os dados efetivamente legíveis. Organize por vacina com: nome padronizado, dose, data, lote (se existir), leitura/confiança (alta, média ou baixa) e pendências de confirmação. Só compare com calendário se os dados necessários estiverem disponíveis e identifique a fonte/página.
+
+${outputLength}
 
 ${context ? `CONTEXTO DE REFERÊNCIA:\n${context}` : 'Não há documento de referência recuperado para esta pergunta.'}`;
 }
@@ -1591,6 +1620,9 @@ async function normalizeImageForAnalysis(dataUrl, maxSide = 2200) {
   return canvas.toDataURL('image/jpeg', 0.92);
 }
 async function analyzeImageWithMistral(dataUrl, apiKey, userQuestion) {
+  const outputLength = responseMode === 'short'
+    ? 'Seja conciso: liste somente vacina, dose, data, confiança e itens para confirmar.'
+    : 'Seja detalhado: inclua todos os campos legíveis e organize cada vacina separadamente.';
   const systemPrompt = `Você é o Vacina.Ai e deve extrair dados de uma carteirinha de vacinação com máxima cautela.
 Primeiro diga em uma linha se a imagem está nítida o suficiente. Depois use EXATAMENTE esta estrutura:
 ## Dados identificados
@@ -1604,6 +1636,7 @@ Para cada vacina legível:
 - Liste rasuras, datas ambíguas e campos ausentes. Se não houver, escreva "Nenhum".
 ## Próximo passo
 - Diga que a comparação com calendário exige data de nascimento e condições especiais relevantes.
+${outputLength}
 Não invente nem complete dados. Não conclua que há atraso ou esquema completo com base apenas na foto. Se não for uma carteirinha, descreva brevemente o que é e peça o documento correto. Responda em português do Brasil.`;
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
@@ -1636,6 +1669,7 @@ function requestCardCorrection() {
 
 // Init
 selectProvider(apiProvider);
+setResponseMode(responseMode);
 loadSavedDocs();
 loadHistory();
 </script>
