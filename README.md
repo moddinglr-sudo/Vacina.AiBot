@@ -1,4 +1,4 @@
-# 💉 Vacina.Ai
+# Vacina.Ai
 
 > Assistente inteligente para análise, interpretação e gestão de cartões de vacinação.
 
@@ -14,13 +14,13 @@ A ferramenta permite extrair, organizar e padronizar informações vacinais a pa
 
 ## Funcionalidades
 
-- 📷 Leitura de cartões de vacinação (imagem, PDF ou digital)
-- 🧾 Extração automática de dados vacinais
-- 📊 Organização e padronização das informações
-- 💡 Interpretação de esquemas vacinais
-- ⏱️ Identificação de doses em atraso
-- ⚠️ Orientações sobre contraindicações
-- 📚 Baseado em protocolos do Ministério da Saúde / PNI
+- Leitura de cartões de vacinação (imagem, PDF ou digital)
+- Extração automática de dados vacinais
+- Organização e padronização das informações
+- Interpretação de esquemas vacinais
+- Identificação de doses em atraso
+- Orientações sobre contraindicações
+- Baseado em protocolos do Ministério da Saúde / PNI
 ---
 
 ## Tecnologias Utilizadas
