@@ -540,7 +540,7 @@
       <button id="providerOllamaBtn" class="provider-btn-chatgpt" onclick="selectProvider('ollama')">Ollama Local</button>
     </div>
     <div id="savedKeyBanner" style="display:none;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--success)">
-      <i class="fa-solid fa-check"></i> Chave configurada neste navegador.
+      <i class="fa-solid fa-check"></i> Chave configurada.
     </div>
     <div id="apiKeySection">
       <input type="password" class="input-field-chatgpt" id="apiKeyInput" placeholder="sk-..." autocomplete="off" />
@@ -921,7 +921,7 @@ async function persistCurrentHistory() {
   await dbSaveHistory(entry);
   historyEntries = [entry, ...historyEntries.filter(item => item.id !== entry.id)].slice(0, 100);
   renderHistoryList();
-  showToast('Análise salva neste navegador.');
+  showToast('Análise salva.');
 }
 function formatHistoryDate(value) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
@@ -930,7 +930,7 @@ function renderHistoryList() {
   const list = document.getElementById('historyList');
   if (!list) return;
   if (!historyEntries.length) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px">Nenhuma análise salva neste navegador.</div>';
+    list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px">Nenhuma análise salva.</div>';
     return;
   }
   const entries = [...historyEntries].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -964,7 +964,7 @@ async function setHistoryStatus(id, status) {
   showToast(status === 'confirmed' ? 'Registro confirmado.' : 'Registro reaberto para revisão.', 'info');
 }
 async function deleteHistory(id) {
-  if (!confirm('Apagar esta análise deste navegador?')) return;
+  if (!confirm('Apagar este chat?')) return;
   await dbDeleteHistory(id);
   historyEntries = historyEntries.filter(entry => entry.id !== id);
   if (currentHistoryId === id) currentHistoryId = null;
@@ -974,7 +974,7 @@ async function clearHistory() {
   if (!historyEntries.length || !confirm('Apagar todo o histórico local? Esta ação não pode ser desfeita.')) return;
   await Promise.all(historyEntries.map(entry => dbDeleteHistory(entry.id)));
   historyEntries = []; currentHistoryId = null; renderHistoryList();
-  showToast('Histórico apagado deste navegador.', 'info');
+  showToast('Histórico apagado.', 'info');
 }
 
 // DRAWERS
