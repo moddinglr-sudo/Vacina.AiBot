@@ -1423,6 +1423,8 @@ async function sendMessage() {
       setProcessingStep('Organizando resposta…');
       const response = await callClaude(question, pdfContext);
       removeTyping(); addMessage('bot', formatBotResponse(response));
+      let respostaTratada = response.replace(/{{current_date}}/g, new Date().toLocaleDateString('pt-BR'));
+      addMessage('bot', formatBotResponse(respostaTratada));
       chatHistory.push({ role: 'user', content: question });
       chatHistory.push({ role: 'assistant', content: response });
       if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
@@ -1439,6 +1441,7 @@ async function sendMessage() {
       const { context, sources } = getRelevantContext(query);
       setProcessingStep('Organizando resposta…');
       const response = await callClaude(query, context);
+      let respostaTratada = response.replace(/{{current_date}}/g, new Date().toLocaleDateString('pt-BR'));
       removeTyping();
       let html = formatBotResponse(response);
       if (sources.length > 0) {
