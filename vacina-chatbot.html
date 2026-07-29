@@ -190,11 +190,12 @@
   }
   .menu-item:hover { background: rgba(255,255,255,0.08); }
   .sidebar-bottom {
-    padding: 12px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   }
   .user-profile-bar {
     display: flex;
