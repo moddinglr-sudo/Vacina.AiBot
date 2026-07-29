@@ -189,14 +189,15 @@
     transition: background 0.15s ease;
   }
   .menu-item:hover { background: rgba(255,255,255,0.08); }
-  .sidebar-bottom {
-  padding: 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  .sidebar-bottom { 
+    padding: 12px; 
+    border-top: 1px 
+      solid var(--border-color); 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
   }
+  
   .user-profile-bar {
     display: flex;
     align-items: center;
@@ -499,7 +500,7 @@
     .msg-body-text { font-size: 14px; }
     .chatgpt-disclaimer { display: none; }
    .input-container-chatgpt { padding: 0 8px
-        calc(env(safe-area-inset-bottom) + 40px);
+        calc(env(safe-area-inset-bottom) + 25px);
   }
     .attachment-card .attach-name { max-width: 130px; }
   }
