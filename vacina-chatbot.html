@@ -1460,11 +1460,10 @@ async function sendMessage() {
   document.getElementById('sendBtn').disabled = false;
   updateStats();
 }
-function buildSystemPrompt(context, responseMode = 'short') {
+function buildSystemPrompt(context) {
   const outputLength = responseMode === 'short'
     ? 'RESPOSTA CURTA: responda em até 6 linhas ou 4 tópicos. Para carteirinhas, mostre apenas os dados essenciais, pendências e próximo passo.'
     : 'RESPOSTA DETALHADA: explique de forma organizada, usando títulos e tópicos quando ajudar. Para carteirinhas, inclua todos os campos legíveis, confiança, pendências e próximo passo.';
-
   return `Você é o Vacina.Ai, assistente informativo para técnicos de imunização.
 
 ESCOPO DO AGENTE (OBRIGATÓRIO)
@@ -1520,9 +1519,7 @@ PARA DOCUMENTOS E CARTEIRINHAS
 
 ${outputLength}
 
-${context
-  ? `CONTEXTO DE REFERÊNCIA:\n${context}`
-  : 'Não há documento de referência disponível. Responda: "Não encontrei essa informação no documento fornecido."'}`;
+${context ? `CONTEXTO DE REFERÊNCIA:\n${context}` : 'Não há documento de referência recuperado para esta pergunta.'}`;
 }
 async function callClaude(query, context) {
   const systemPrompt = buildSystemPrompt(context);
